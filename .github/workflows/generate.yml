@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           # REPLACE WITH YOUR ACTUAL SOURCE REPO
-          repository: your-org/gearbox-studio 
+          repository: Wasif-ZA/Gearboxstudio
           path: external-source
           # Use the SHA provided by the dispatch event, or default to main
           ref: ${{ github.event.client_payload.sha || inputs.source_ref || 'main' }}
