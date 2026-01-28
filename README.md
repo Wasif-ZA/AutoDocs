@@ -15,7 +15,7 @@ Automatically generate comprehensive documentation for React components using AI
 ## Installation
 
 ```bash
-pnpm install
+npm install
 ```
 
 ## Configuration
@@ -53,43 +53,43 @@ export default config;
 
 ```bash
 # Generate docs for all components
-pnpm autodocs generate
+npm run autodocs -- generate
 
 # Incremental mode (only changed files)
-pnpm autodocs generate --incremental
+npm run autodocs -- generate --incremental
 
 # Dry run (preview without writing)
-pnpm autodocs generate --dry-run
+npm run autodocs -- generate --dry-run
 
 # With validation
-pnpm autodocs generate --validate
+npm run autodocs -- generate --validate
 
 # Verbose logging
-pnpm autodocs generate --verbose
+npm run autodocs -- generate --verbose
 ```
 
 ### Cache Management
 
 ```bash
 # Show cache statistics
-pnpm autodocs cache --stats
+npm run autodocs -- cache --stats
 
 # Clear cache
-pnpm autodocs cache --clear
+npm run autodocs -- cache --clear
 ```
 
 ### Validate Component
 
 ```bash
 # Validate AST extraction for a single file
-pnpm autodocs validate src/components/Button.tsx
+npm run autodocs -- validate src/components/Button.tsx
 ```
 
 ### Initialize Configuration
 
 ```bash
 # Create default configuration file
-pnpm autodocs init
+npm run autodocs -- init
 ```
 
 ## Environment Variables
@@ -133,13 +133,13 @@ The included GitHub Actions workflow:
 
 ```bash
 # Run tests
-pnpm test
+npm test
 
 # Run tests once
-pnpm test:run
+npm run test:run
 
 # Type check
-pnpm typecheck
+npm run typecheck
 ```
 
 ## License
