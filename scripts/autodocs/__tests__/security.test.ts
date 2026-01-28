@@ -6,6 +6,7 @@ describe('SecuritySanitizer', () => {
   const config = ConfigSchema.parse({});
   const sanitizer = new SecuritySanitizer(config.security);
 
+
   it('redacts API keys', () => {
     const content = `
       const apiKey = "sk-1234567890abcdef";

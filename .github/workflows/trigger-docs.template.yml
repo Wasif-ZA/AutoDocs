@@ -1,0 +1,29 @@
+# .github/workflows/trigger-docs.yml
+# 
+# This file goes in the SOURCE repository (e.g., Gearbox Studio)
+# It sends a signal to the AutoDocs repository when components change.
+#
+# INSTRUCTIONS:
+# 1. Copy this file to your source repo's .github/workflows/ folder
+# 2. Add GH_PAT_TOKEN secret to your source repo (Personal Access Token with 'repo' scope)
+# 3. Update the 'repository' field below to point to your AutoDocs repo
+#
+name: Trigger Documentation Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/components/**' # Only trigger if components change
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Signal
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GH_PAT_TOKEN }} # Must be a Personal Access Token with 'repo' scope
+          repository: your-org/autodocs-repo # REPLACE THIS with your AutoDocs repository
+          event-type: generate-docs
+          client-payload: '{"sha": "${{ github.sha }}", "ref": "${{ github.ref }}"}'

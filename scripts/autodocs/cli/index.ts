@@ -6,14 +6,14 @@ import fs from 'fs/promises';
 import path from 'path';
 import ora from 'ora';
 import chalk from 'chalk';
-import { loadConfig } from '../config/index.js';
+import { loadConfig, Config } from '../config/index.js';
 import { ComponentExtractor } from '../core/extract.js';
 import { DocumentationGenerator } from '../core/llm.js';
 import { DocumentationRenderer } from '../core/render.js';
 import { CodeValidator } from '../core/validate.js';
 import { parallelWithLimit } from '../utils/concurrency.js';
 import { logger } from '../utils/logger.js';
-import simpleGit from 'simple-git';
+import { simpleGit } from 'simple-git';
 
 const git = simpleGit();
 
@@ -34,6 +34,7 @@ program
   .option('--no-cache', 'Disable caching')
   .option('--validate', 'Validate generated code examples')
   .option('--verbose', 'Enable verbose logging')
+  .option('-o, --overrides <json>', 'JSON config overrides')
   .action(async (options) => {
     const spinner = ora('Loading configuration...').start();
 
@@ -42,9 +43,37 @@ program
     }
 
     try {
+      // Parse CLI overrides safely
+      let cliOverrides: Partial<Config> = {};
+      if (options.overrides) {
+        try {
+          cliOverrides = JSON.parse(options.overrides);
+          // Basic validation to ensure it's an object
+          if (typeof cliOverrides !== 'object' || cliOverrides === null) {
+            throw new Error('Overrides must be a JSON object');
+          }
+        } catch (e) {
+          spinner.fail(`Invalid JSON in --overrides: ${(e as Error).message}`);
+          process.exit(1);
+        }
+      }
+
+      // Load config with overrides
       const config = await loadConfig({
-        features: { validateCodeExamples: options.validate ?? false },
+        ...cliOverrides,
+        features: {
+          extractFromStories: cliOverrides.features?.extractFromStories ?? true,
+          generateChangelog: cliOverrides.features?.generateChangelog ?? false,
+          watchMode: cliOverrides.features?.watchMode ?? false,
+          // CLI flag takes precedence > overrides > config file
+          validateCodeExamples: options.validate ?? cliOverrides.features?.validateCodeExamples ?? false,
+        },
       });
+
+      // Log if we are in "External Mode"
+      if (options.overrides && cliOverrides.paths?.components) {
+        spinner.info(chalk.blue(`Using external component path: ${config.paths.components}`));
+      }
 
       spinner.text = 'Initializing...';
 
@@ -153,7 +182,9 @@ program
 
       // Generate index
       if (!options.dryRun && successful.length > 0) {
-        const docs = successful.map(r => r.result!.doc);
+        const docs = successful
+          .map(r => r.result?.doc)
+          .filter((doc): doc is NonNullable<typeof doc> => doc !== undefined);
         const index = renderer.renderIndex(docs);
         await fs.writeFile(path.join(config.paths.docs, 'index.mdx'), index);
         console.log(chalk.blue('  → Generated index.mdx'));
@@ -161,9 +192,10 @@ program
 
       // Write suggestions
       const allSuggestions = successful
-        .filter(r => r.result?.doc)
-        .flatMap(r => r.result!.doc.suggestions.map(s => ({
-          component: r.result!.doc.name,
+        .map(r => r.result?.doc)
+        .filter((doc): doc is NonNullable<typeof doc> => doc !== undefined)
+        .flatMap(doc => doc.suggestions.map(s => ({
+          component: doc.name,
           ...s,
         })));
 

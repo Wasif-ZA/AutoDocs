@@ -1,9 +1,18 @@
 import type { Config } from './scripts/autodocs/config/schema.js';
 
-const config: Partial<Config> = {
+// DeepPartial makes all nested properties optional, matching Zod's runtime defaults
+type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
+const config: DeepPartial<Config> = {
   paths: {
-    components: 'src/components',
+    // In CI, look for components in the sibling directory created by GitHub Actions
+    // Locally, use the default path. This can also be overridden via CLI --overrides flag.
+    components: process.env.CI ? '../external-source/src/components' : 'src/components',
     docs: 'pages/docs/components',
+    suggestions: '.autodocs/suggestions.json',
+    cache: '.autodocs/cache',
   },
   patterns: {
     include: ['**/*.tsx'],
