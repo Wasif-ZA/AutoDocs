@@ -1,0 +1,176 @@
+name: AutoDocs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/components/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/components/**'
+  workflow_dispatch:
+    inputs:
+      full_rebuild:
+        description: 'Force full documentation rebuild'
+        required: false
+        default: 'false'
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: autodocs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for git diff
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore cache
+        uses: actions/cache@v4
+        with:
+          path: .autodocs/cache
+          key: autodocs-cache-${{ hashFiles('src/components/**/*.tsx') }}
+          restore-keys: |
+            autodocs-cache-
+
+      - name: Generate Documentation
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.full_rebuild }}" == "true" ]]; then
+            echo "Running full rebuild..."
+            pnpm autodocs generate --validate
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "Running incremental build for PR..."
+            pnpm autodocs generate --incremental --validate
+          else
+            echo "Running incremental build..."
+            pnpm autodocs generate --incremental
+          fi
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if [[ -n $(git status --porcelain pages/docs) ]]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.has_changes == 'true' && github.event_name == 'push'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'docs: auto-generated documentation update'
+          title: 'Documentation Update'
+          body: |
+            This PR contains auto-generated documentation updates.
+
+            ## Changes
+            - Updated component documentation based on source code changes
+
+            ## Review Checklist
+            - [ ] Generated examples are accurate
+            - [ ] Props are correctly documented
+            - [ ] No sensitive information leaked
+          branch: autodocs/update
+          delete-branch: true
+          labels: documentation,automated
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.changes.outputs.has_changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let suggestions = [];
+            try {
+              suggestions = JSON.parse(fs.readFileSync('.autodocs/suggestions.json', 'utf8'));
+            } catch (e) {
+              console.log('No suggestions file found');
+            }
+
+            const critical = suggestions.filter(s => s.priority === 'critical');
+            const high = suggestions.filter(s => s.priority === 'high');
+
+            let comment = '## Documentation Generated\n\n';
+
+            if (critical.length > 0) {
+              comment += '### Critical Issues\n\n';
+              critical.forEach(s => {
+                comment += `- **${s.component}**: ${s.message}\n`;
+              });
+              comment += '\n';
+            }
+
+            if (high.length > 0) {
+              comment += '### High Priority Suggestions\n\n';
+              high.forEach(s => {
+                comment += `- **${s.component}**: ${s.message}\n`;
+              });
+            }
+
+            if (critical.length === 0 && high.length === 0) {
+              comment += 'No critical issues found!\n';
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Run tests
+        run: pnpm test:run
