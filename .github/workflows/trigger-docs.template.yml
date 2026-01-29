@@ -24,6 +24,6 @@ jobs:
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.GH_PAT_TOKEN }} # Must be a Personal Access Token with 'repo' scope
-          repository: your-org/autodocs-repo # REPLACE THIS with your AutoDocs repository
+          repository: Wasif-ZA/AutoDocs # REPLACE THIS with your AutoDocs repository
           event-type: generate-docs
           client-payload: '{"sha": "${{ github.sha }}", "ref": "${{ github.ref }}"}'
