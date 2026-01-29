@@ -7,18 +7,22 @@ type DeepPartial<T> = {
 
 const config: DeepPartial<Config> = {
   paths: {
-    // In CI, look for components in the sibling directory created by GitHub Actions
-    // Locally, use the default path. This can also be overridden via CLI --overrides flag.
-    components: process.env.CI ? '../external-source/src/components' : 'src/components',
+    // Points to the root of the source code so the glob can reach everything
+    components: process.env.CI ? '../external-source/code' : './code',
     docs: 'pages/docs/components',
     suggestions: '.autodocs/suggestions.json',
     cache: '.autodocs/cache',
   },
   patterns: {
-    include: ['**/*.tsx'],
+    // The '**' pattern ensures it looks inside all template subfolders
+    include: [
+      '**/components/**/*.tsx',
+      '**/templates/**/*.tsx'
+    ],
     exclude: [
       '**/*.stories.tsx',
       '**/*.test.tsx',
+      '**/node_modules/**',
       '**/internal/**',
     ],
   },
