@@ -1,147 +1,105 @@
 # AutoDocs
 
-Automatically generate comprehensive documentation for React components using AI.
+[![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-CI-2088FF?logo=githubactions&logoColor=white)](https://github.com/features/actions)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-Compatible-412991?logo=openai&logoColor=white)](https://platform.openai.com/)
 
-## Features
+Generate high-signal markdown docs from TypeScript and TSX source files using AST extraction plus schema-validated LLM output.
 
-- **AST-Powered Extraction**: Uses TypeScript's AST to accurately extract component props, types, and metadata
-- **AI-Generated Documentation**: Leverages Claude to generate descriptions, usage examples, and accessibility notes
-- **Intelligent Caching**: File-hash based caching with TTL to minimize API calls
-- **Security First**: Pattern-based sanitization to prevent sensitive data leaks
-- **Production Ready**: Rate limiting, retry logic, parallel processing, and comprehensive error handling
-- **Flexible Output**: Supports MDX, Markdown, and JSON output formats
-- **CI/CD Integration**: GitHub Actions workflow with PR creation and suggestions
+## Problem Statement
+Engineering teams ship APIs and components faster than they can maintain docs. Manual documentation drifts, examples become stale, and code review velocity drops. AutoDocs automates source-to-doc generation so references stay current and enforceable.
 
-## Installation
+## Pipeline
+```mermaid
+flowchart TD
+    A[Source Code] --> B[AST Parser]
+    B --> C[Prompt Constructor]
+    C --> D[Token-aware Chunker]
+    D --> E[LLM API]
+    E --> F[Schema Validator]
+    F --> G[Markdown Writer]
+```
 
+### Incremental changed-file detection
+```mermaid
+flowchart TD
+    S[Start Run] --> H[Hash Input Files]
+    H --> C{Hash changed since last run?}
+    C -- No --> K[Skip file]
+    C -- Yes --> P[Parse + Generate + Validate + Write]
+    P --> U[Persist new hash]
+    K --> N{More files?}
+    U --> N
+    N -- Yes --> C
+    N -- No --> E[End Run]
+```
+
+## Engineering Decisions
+- **AST over raw text**: preserves signatures, types, and export intent instead of heuristic parsing.
+- **Token-aware chunking**: keeps prompts within model limits while retaining semantic boundaries.
+- **JSON schema validation + retry**: invalid model responses are rejected and regenerated deterministically.
+- **Incremental file hashing**: unchanged files skip expensive generation work.
+- **Docker containerisation**: reproducible CI execution and environment parity across machines.
+
+## Quick Start
+### 1) Install
 ```bash
 npm install
 ```
 
-## Configuration
+### 2) Run mock mode
+```bash
+npm run build
+node dist/index.js --mock ./examples/sample-input
+```
 
-Create an `autodocs.config.ts` file in your project root:
+### 3) GitHub Actions snippet
+```yaml
+- name: Build
+  run: npm run build
 
-```typescript
-import type { Config } from './scripts/autodocs/config/schema';
+- name: Generate docs in mock mode
+  run: node dist/index.js --mock ./examples/sample-input
+```
 
-const config: Partial<Config> = {
-  paths: {
-    components: 'src/components',
-    docs: 'pages/docs/components',
-  },
-  patterns: {
-    include: ['**/*.tsx'],
-    exclude: ['**/*.stories.tsx', '**/*.test.tsx'],
-  },
-  llm: {
-    model: 'claude-sonnet-4-20250514',
-    temperature: 0,
-  },
-  output: {
-    format: 'mdx',
-    includeSourceLink: true,
-  },
+### 4) Required environment variables
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | Yes (live mode) | Auth for model calls when mock mode is disabled. |
+| `AUTODOCS_MODEL` | No | Override default model identifier. |
+| `AUTODOCS_OUTPUT_DIR` | No | Override docs output directory. |
+
+## Before / After
+### Before
+```ts
+export const truncate = (input: string, maxLength: number): string => {
+  const symbols = Array.from(input);
+  if (symbols.length <= maxLength) return input;
+  return `${symbols.slice(0, maxLength - 1).join('')}…`;
 };
-
-export default config;
 ```
 
-## Usage
+### After
+```md
+### truncate(input, maxLength)
+Truncates by Unicode symbols and appends an ellipsis when clipping is required.
 
-### Generate Documentation
-
-```bash
-# Generate docs for all components
-npm run autodocs -- generate
-
-# Incremental mode (only changed files)
-npm run autodocs -- generate --incremental
-
-# Dry run (preview without writing)
-npm run autodocs -- generate --dry-run
-
-# With validation
-npm run autodocs -- generate --validate
-
-# Verbose logging
-npm run autodocs -- generate --verbose
+| Parameter | Type | Description |
+| --- | --- | --- |
+| input | string | String to shorten safely. |
+| maxLength | number | Max symbol length including ellipsis. |
 ```
 
-### Cache Management
+## Architecture Overview
+- `parser/`: AST traversal and typed symbol extraction.
+- `prompt/`: deterministic prompt assembly and context shaping.
+- `llm/`: provider adapters and retry orchestration.
+- `validator/`: response schema checks and structured error surfaces.
+- `writer/`: markdown rendering and file emission.
+- `cli/`: command parsing, mode selection, and execution lifecycle.
 
-```bash
-# Show cache statistics
-npm run autodocs -- cache --stats
-
-# Clear cache
-npm run autodocs -- cache --clear
-```
-
-### Validate Component
-
-```bash
-# Validate AST extraction for a single file
-npm run autodocs -- validate src/components/Button.tsx
-```
-
-### Initialize Configuration
-
-```bash
-# Create default configuration file
-npm run autodocs -- init
-```
-
-## Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude | Yes |
-
-## Architecture
-
-```
-scripts/autodocs/
-├── config/           # Configuration system with Zod validation
-├── core/             # Core modules (extract, llm, render, validate)
-├── utils/            # Utilities (cache, logger, security, concurrency)
-├── cli/              # CLI commands
-└── __tests__/        # Test suite
-```
-
-## Output Format
-
-Generated documentation includes:
-
-- Component description and category
-- Props table with types, defaults, and descriptions
-- Usage examples with live code
-- Accessibility notes (ARIA, keyboard navigation)
-- Best practices (do's and don'ts)
-- Improvement suggestions
-
-## CI/CD Integration
-
-The included GitHub Actions workflow:
-
-1. Triggers on pushes to `src/components/`
-2. Generates documentation incrementally
-3. Creates a PR with documentation updates
-4. Comments on PRs with suggestions
-
-## Testing
-
-```bash
-# Run tests
-npm test
-
-# Run tests once
-npm run test:run
-
-# Type check
-npm run typecheck
-```
-
-## License
-
-MIT
+## Roadmap
+1. Add provider failover across multiple model backends with health scoring.
+2. Generate framework-specific examples (React, Node, and SDK clients) from one schema.
+3. Publish a prebuilt Docker image with pinned runtime and default workflow templates.

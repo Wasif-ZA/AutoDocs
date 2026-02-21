@@ -11,7 +11,8 @@
     "autodocs:cache": "tsx scripts/autodocs/cli/index.ts cache --stats",
     "test": "vitest",
     "test:run": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --outfile=dist/index.js"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.27.0",

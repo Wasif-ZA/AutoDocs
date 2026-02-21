@@ -1,0 +1,286 @@
+{
+  "stringUtils.ts": {
+    "moduleOverview": "Utility helpers for normalizing user-facing strings and locale-aware date formatting.",
+    "exports": [
+      {
+        "name": "capitalize",
+        "kind": "function",
+        "description": "Uppercases the first Unicode symbol in a string while preserving the remaining symbols.",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "string",
+            "description": "Text value to capitalize."
+          }
+        ],
+        "returns": {
+          "type": "string",
+          "description": "Original string with the first symbol converted to locale-aware uppercase, or an empty string when input is empty."
+        },
+        "usageExamples": [
+          "capitalize('developer') // 'Developer'",
+          "capitalize('ßeta') // 'SSeta' in locales where ß uppercases to SS"
+        ],
+        "edgeCases": [
+          "Returns an empty string when input is empty.",
+          "Handles surrogate pairs and extended grapheme clusters by splitting with Array.from."
+        ]
+      },
+      {
+        "name": "truncate",
+        "kind": "function",
+        "description": "Truncates a string by Unicode symbols and appends a single ellipsis when truncation occurs.",
+        "parameters": [
+          {
+            "name": "input",
+            "type": "string",
+            "description": "String to shorten."
+          },
+          {
+            "name": "maxLength",
+            "type": "number",
+            "description": "Maximum number of symbols to keep including ellipsis when truncation is needed."
+          }
+        ],
+        "returns": {
+          "type": "string",
+          "description": "Original string when short enough, otherwise a symbol-safe truncated string ending with an ellipsis."
+        },
+        "usageExamples": [
+          "truncate('Internationalization', 8) // 'Interna…'",
+          "truncate('👨‍👩‍👧‍👦 family', 4) // '👨‍👩‍👧‍👦 f…'"
+        ],
+        "edgeCases": [
+          "Throws RangeError if maxLength is negative or not an integer.",
+          "Returns only an ellipsis when maxLength is 1 and input is longer than one symbol."
+        ]
+      },
+      {
+        "name": "formatDate",
+        "kind": "function",
+        "description": "Formats a Date with Intl.DateTimeFormat using configurable locale and medium date + short time styles.",
+        "parameters": [
+          {
+            "name": "date",
+            "type": "Date",
+            "description": "Valid Date instance to format."
+          },
+          {
+            "name": "locale",
+            "type": "string",
+            "description": "Optional BCP 47 locale identifier; defaults to en-US."
+          }
+        ],
+        "returns": {
+          "type": "string",
+          "description": "Locale-formatted date-time string."
+        },
+        "usageExamples": [
+          "formatDate(new Date('2025-02-03T09:30:00Z'))",
+          "formatDate(new Date('2025-02-03T09:30:00Z'), 'de-DE')"
+        ],
+        "edgeCases": [
+          "Throws TypeError when date is invalid or not a Date instance.",
+          "Throws RangeError when locale is blank or whitespace."
+        ]
+      }
+    ]
+  },
+  "ApiClient.ts": {
+    "moduleOverview": "HTTP client abstraction with retry, timeout, and structured API error handling.",
+    "exports": [
+      {
+        "name": "ApiError",
+        "kind": "class",
+        "description": "Error type carrying HTTP status, endpoint, and optional raw response details.",
+        "parameters": [
+          {
+            "name": "message",
+            "type": "string",
+            "description": "Human-readable error summary."
+          },
+          {
+            "name": "status",
+            "type": "number",
+            "description": "HTTP status code associated with the failure."
+          },
+          {
+            "name": "endpoint",
+            "type": "string",
+            "description": "Endpoint path used for the failed request."
+          },
+          {
+            "name": "details",
+            "type": "string",
+            "description": "Optional response body details for diagnostics."
+          }
+        ],
+        "returns": {
+          "type": "ApiError",
+          "description": "Constructed error instance that extends Error."
+        },
+        "usageExamples": [
+          "throw new ApiError('Unauthorized', 401, '/users', 'Missing bearer token')"
+        ],
+        "edgeCases": [
+          "Used for both non-2xx responses and terminal retry failures.",
+          "Non-retriable 4xx errors are thrown immediately."
+        ]
+      },
+      {
+        "name": "ApiClient",
+        "kind": "class",
+        "description": "Client wrapper around fetch that enforces JSON responses, timeout, and exponential backoff retry policy.",
+        "parameters": [
+          {
+            "name": "baseUrl",
+            "type": "string",
+            "description": "Base origin used to resolve endpoint paths."
+          },
+          {
+            "name": "timeoutMs",
+            "type": "number",
+            "description": "Per-attempt timeout in milliseconds."
+          }
+        ],
+        "returns": {
+          "type": "ApiClient",
+          "description": "ApiClient instance exposing request<T>()."
+        },
+        "usageExamples": [
+          "const api = new ApiClient('https://api.example.com', 4000)",
+          "const profile = await api.request<{ id: string }>('/users/42')"
+        ],
+        "edgeCases": [
+          "Retries up to three attempts for network failures, aborts, and 5xx responses.",
+          "Throws ApiError when response JSON is not an object or array."
+        ]
+      }
+    ]
+  },
+  "UserService.ts": {
+    "moduleOverview": "Domain service that loads users from the API layer and validates the resulting payload.",
+    "exports": [
+      {
+        "name": "User",
+        "kind": "class",
+        "description": "Domain contract describing the shape of a valid user returned by UserService.",
+        "parameters": [],
+        "returns": {
+          "type": "User",
+          "description": "Strongly typed user object with identity, profile, and status fields."
+        },
+        "usageExamples": [
+          "const user: User = await userService.getUserById('u_123')"
+        ],
+        "edgeCases": [
+          "Validation rejects malformed email or invalid createdAt timestamp.",
+          "Null API user payload is translated into UserNotFoundError."
+        ]
+      },
+      {
+        "name": "UserNotFoundError",
+        "kind": "class",
+        "description": "Domain-level error representing a missing user independent of transport concerns.",
+        "parameters": [
+          {
+            "name": "userId",
+            "type": "string",
+            "description": "Identifier that could not be resolved."
+          }
+        ],
+        "returns": {
+          "type": "UserNotFoundError",
+          "description": "Constructed error instance with user-specific message."
+        },
+        "usageExamples": [
+          "if (error instanceof UserNotFoundError) { /* show empty state */ }"
+        ],
+        "edgeCases": [
+          "Thrown when API returns 404 status.",
+          "Thrown when API returns a successful response containing user: null."
+        ]
+      },
+      {
+        "name": "UserService",
+        "kind": "class",
+        "description": "Application service that depends on ApiClient and maps API failures to domain-specific errors.",
+        "parameters": [
+          {
+            "name": "apiClient",
+            "type": "ApiClient",
+            "description": "Injected HTTP client dependency."
+          }
+        ],
+        "returns": {
+          "type": "UserService",
+          "description": "Service exposing user retrieval methods."
+        },
+        "usageExamples": [
+          "const service = new UserService(new ApiClient('https://api.example.com'))",
+          "await service.getUserById('usr_789')"
+        ],
+        "edgeCases": [
+          "Throws RangeError when id is blank.",
+          "Throws TypeError for structurally invalid user payload fields."
+        ]
+      }
+    ]
+  },
+  "UserCard.tsx": {
+    "moduleOverview": "Dashboard-style React component that loads and renders a user profile with loading and error states.",
+    "exports": [
+      {
+        "name": "UserCardProps",
+        "kind": "component",
+        "description": "Props contract defining the selected user id and injected UserService dependency.",
+        "parameters": [
+          {
+            "name": "userId",
+            "type": "string",
+            "description": "User identifier to fetch."
+          },
+          {
+            "name": "userService",
+            "type": "UserService",
+            "description": "Service responsible for loading user data."
+          }
+        ],
+        "returns": {
+          "type": "JSX.Element",
+          "description": "Rendered profile card section."
+        },
+        "usageExamples": [
+          "<UserCard userId=\"usr_42\" userService={userService} />"
+        ],
+        "edgeCases": [
+          "Renders loading view while async request is in progress.",
+          "Renders error panel when UserService throws."
+        ]
+      },
+      {
+        "name": "UserCard",
+        "kind": "component",
+        "description": "Functional component using useEffect and useState to fetch and display profile attributes.",
+        "parameters": [
+          {
+            "name": "props",
+            "type": "UserCardProps",
+            "description": "Component props controlling requested user and service dependency."
+          }
+        ],
+        "returns": {
+          "type": "JSX.Element",
+          "description": "Styled card UI with profile metadata and status badges."
+        },
+        "usageExamples": [
+          "const view = <UserCard userId={selectedId} userService={userService} />"
+        ],
+        "edgeCases": [
+          "Cancels stale updates with an isCurrent guard when component unmounts.",
+          "Dependency array includes userId and userService to avoid stale requests."
+        ]
+      }
+    ]
+  }
+}

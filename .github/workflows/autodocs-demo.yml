@@ -1,0 +1,54 @@
+name: AutoDocs Demo
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  generate-mock-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Fetch repository contents so the workflow can build and commit generated docs.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Install Node.js 20 and enable npm cache for faster repeat runs.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # Install exact dependency versions from lockfile.
+      - name: Install dependencies
+        run: npm ci
+
+      # Compile project artifacts to dist/.
+      - name: Build project
+        run: npm run build
+
+      # Run deterministic mock-mode generation against example source files.
+      - name: Generate docs in mock mode
+        run: node dist/index.js --mock ./examples/sample-input
+
+      # Commit generated documentation updates if any files changed.
+      - name: Commit generated docs
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .
+            git commit -m "chore: update generated docs from autodocs demo"
+            git push
+          else
+            echo "No documentation changes detected."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
