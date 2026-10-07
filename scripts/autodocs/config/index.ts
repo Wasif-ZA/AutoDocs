@@ -32,6 +32,7 @@ export async function loadConfig(overrides: Partial<Config> = {}): Promise<Confi
   );
 
   const validated = ConfigSchema.parse(merged);
+  if (process.env.AUTODOCS_MODEL) validated.llm.model = process.env.AUTODOCS_MODEL;
 
   // Resolve paths relative to root
   validated.paths.components = path.resolve(validated.root, validated.paths.components);

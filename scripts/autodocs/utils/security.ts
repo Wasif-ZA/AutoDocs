@@ -64,7 +64,7 @@ export class SecuritySanitizer {
       /dangerouslySetInnerHTML/,
       /<script/i,
       /javascript:/i,
-      /on\w+\s*=/i, // onclick, onerror, etc.
+      /on\w+\s*=(?!\s*\{)/i, // onclick, onerror, etc. (JSX onX={handler} is allowed)
     ];
 
     for (const pattern of dangerousPatterns) {

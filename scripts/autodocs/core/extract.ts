@@ -8,6 +8,7 @@ import {
   SourceFile,
   ts,
 } from 'ts-morph';
+import path from 'path';
 import { ASTExtractionResult } from '../config/schema.js';
 import { logger } from '../utils/logger.js';
 
@@ -45,16 +46,26 @@ export class ComponentExtractor {
 
     try {
       const sourceFile = this.project.createSourceFile(
-        `${Date.now()}.tsx`,
+        'input.tsx',
         content,
         { overwrite: true }
       );
+
+      const syntaxErrors = this.project
+        .getProgram()
+        .compilerObject.getSyntacticDiagnostics(sourceFile.compilerNode);
+      if (syntaxErrors.length > 0) {
+        result.astErrors.push(
+          ...syntaxErrors.map(d => `Syntax error: ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`)
+        );
+        return result;
+      }
 
       // Extract imports
       result.imports = this.extractImports(sourceFile);
 
       // Find the main component
-      const component = this.findMainComponent(sourceFile);
+      const component = this.findMainComponent(sourceFile, filePath);
       if (!component) {
         result.astErrors.push('Could not identify main component export');
         return result;
@@ -118,7 +129,7 @@ export class ComponentExtractor {
     });
   }
 
-  private findMainComponent(sourceFile: SourceFile): {
+  private findMainComponent(sourceFile: SourceFile, filePath: string): {
     name: string;
     exportType: 'default' | 'named' | 'both';
     isForwardRef: boolean;
@@ -152,7 +163,11 @@ export class ComponentExtractor {
     }
 
     // Determine which export is the "main" component
-    const mainExport = defaultExport || namedExports[0];
+    const baseName = path.basename(filePath).replace(/\.[jt]sx?$/, '');
+    const valueExports = namedExports.filter(
+      e => !Node.isInterfaceDeclaration(e.node) && !Node.isTypeAliasDeclaration(e.node)
+    );
+    const mainExport = defaultExport || valueExports.find(e => e.name === baseName) || valueExports[0];
     if (!mainExport) return null;
 
     // Analyze the component
@@ -202,11 +217,7 @@ export class ComponentExtractor {
           result.isMemo = true;
         }
 
-        // Extract props type from generic
-        const propsMatch = text.match(/<(\w+(?:Props)?)\s*[,>]/);
-        if (propsMatch) {
-          result.propsType = propsMatch[1];
-        }
+        result.propsType = this.propsTypeFromExpression(initializer);
 
         // Check for HOC pattern
         if (text.includes('withRouter') || text.includes('connect(') || text.includes('withStyles')) {
@@ -238,6 +249,22 @@ export class ComponentExtractor {
     }
 
     return result;
+  }
+
+  private propsTypeFromExpression(expr: Node): string | null {
+    if (Node.isArrowFunction(expr) || Node.isFunctionExpression(expr)) {
+      return expr.getParameters()[0]?.getTypeNode()?.getText() ?? null;
+    }
+    if (Node.isCallExpression(expr)) {
+      const typeArgs = expr.getTypeArguments();
+      if (typeArgs.length > 0) {
+        // forwardRef<Ref, Props> puts props last; memo<Props> has one argument
+        return typeArgs[typeArgs.length - 1].getText();
+      }
+      const inner = expr.getArguments()[0];
+      return inner ? this.propsTypeFromExpression(inner) : null;
+    }
+    return null;
   }
 
   private extractPropsFromType(

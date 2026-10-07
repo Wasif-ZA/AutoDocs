@@ -116,6 +116,10 @@ describe('SecuritySanitizer', () => {
     expect(issues.some(i => i.includes('innerHTML'))).toBe(true);
   });
 
+  it('flags unquoted inline event handlers', () => {
+    expect(sanitizer.validateOutput('<img src=x onerror=alert(1)>').valid).toBe(false);
+  });
+
   it('passes validation for safe code', () => {
     const safeCode = `
       export function Button({ label, onClick }) {

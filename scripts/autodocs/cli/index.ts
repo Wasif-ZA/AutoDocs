@@ -108,16 +108,18 @@ program
         } catch {
           // If git diff fails, fall back to full scan
           logger.warn('Git diff failed, falling back to full scan');
-          files = await glob(
-            config.patterns.include.map(p => path.join(config.paths.components, p)),
-            { ignore: config.patterns.exclude }
-          );
+          files = await glob(config.patterns.include, {
+            cwd: config.paths.components,
+            ignore: config.patterns.exclude,
+            absolute: true,
+          });
         }
       } else {
-        files = await glob(
-          config.patterns.include.map(p => path.join(config.paths.components, p)),
-          { ignore: config.patterns.exclude }
-        );
+        files = await glob(config.patterns.include, {
+          cwd: config.paths.components,
+          ignore: config.patterns.exclude,
+          absolute: true,
+        });
       }
 
       spinner.succeed(`Found ${files.length} files to process`);
@@ -146,7 +148,7 @@ program
           const doc = await generator.generate(file, content, astResult);
 
           if (!doc) {
-            return { skipped: true, reason: 'Generation failed' };
+            throw new Error(`Generation failed for ${astResult.componentName}`);
           }
 
           // Validate if requested

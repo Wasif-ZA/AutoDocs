@@ -220,6 +220,19 @@ describe('ComponentExtractor', () => {
     expect(result.astErrors.length).toBeGreaterThan(0);
   });
 
+  it('picks the value export matching the filename over an exported props interface', () => {
+    const code = `
+      export interface CardProps { title: string; }
+      export const helper = () => null;
+      export const Card = ({ title }: CardProps) => <h2>{title}</h2>;
+    `;
+
+    const result = extractor.extract('src\\components\\Card.tsx', code);
+
+    expect(result.componentName).toBe('Card');
+    expect(result.props.map(p => p.name)).toEqual(['title']);
+  });
+
   it('handles empty file', () => {
     const result = extractor.extract('Empty.tsx', '');
 

@@ -8,14 +8,16 @@ This directory demonstrates how AutoDocs transforms strongly-typed TypeScript an
 - `sample-input/UserService.ts`: Domain service using dependency injection and error translation.
 - `sample-input/UserCard.tsx`: Dashboard-style React component with loading and failure states.
 
-## What AutoDocs generated
-- `sample-output/*.md`: API-style markdown references for each module.
-- `mock-responses.json`: Deterministic mock-mode responses keyed by source filename for repeatable local demos.
+## Reference pages and mock responses
+- `sample-output/*.md`: hand-written reference pages showing the target style. The tool does not write here.
+- `mock-responses.json`: deterministic mock-mode responses keyed by source filename. Mock mode reads these instead of calling a model.
 
 ## Run in mock mode
 ```bash
 npm run build
-node dist/index.js --mock ./examples/sample-input
+node dist/index.js --mock ./examples/sample-input --out ./docs
 ```
+
+Each module becomes `docs/<module>.md`. A response that names an export the source does not have is rejected.
 
 Use this flow to evaluate extraction, rendering, and formatting behavior without external LLM calls.
